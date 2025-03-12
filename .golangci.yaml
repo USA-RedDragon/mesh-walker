@@ -34,7 +34,6 @@ linters:
     - misspell
     - nilerr
     - nilnil
-    - noctx
     - nosprintfhostport
     - paralleltest
     - prealloc

@@ -1,7 +1,6 @@
 package http
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -69,14 +68,7 @@ func (c *Client) Get(url string) (*data.Response, error) {
 }
 
 func (c *Client) get(url string) (*http.Response, error) {
-	ctx, cancel := context.WithTimeout(context.TODO(), c.client.Timeout)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := c.client.Do(req)
+	resp, err := c.client.Get(url)
 	if err != nil {
 		return nil, err
 	}
