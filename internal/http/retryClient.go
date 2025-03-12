@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -30,6 +31,7 @@ func NewClient(timeout time.Duration, retries int, jitter time.Duration) *Client
 }
 
 func (c *Client) jitterSleep() {
+	//nolint:golint,gosec
 	time.Sleep(time.Duration(rand.Int63n(int64(c.jitter))))
 }
 
@@ -67,7 +69,14 @@ func (c *Client) Get(url string) (*data.Response, error) {
 }
 
 func (c *Client) get(url string) (*http.Response, error) {
-	resp, err := c.client.Get(url)
+	ctx, cancel := context.WithTimeout(context.TODO(), c.client.Timeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}

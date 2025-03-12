@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"log/slog"
@@ -45,7 +46,13 @@ func main() {
 
 	w := bufio.NewWriter(responsesFile)
 
-	w.Write([]byte("["))
+	n, err := w.Write([]byte("["))
+	if err != nil {
+		log.Fatalf("Error writing opening bracket: %v", err)
+	}
+	if n != 1 {
+		log.Fatalf("Error writing opening bracket: %v", err)
+	}
 	enc := json.NewEncoder(w)
 
 	for resp := range respChan {
@@ -63,10 +70,19 @@ func main() {
 				}
 			}
 
-			enc.Encode(nodeEntry{
+			err = enc.Encode(nodeEntry{
 				Data: *resp,
 			})
-			w.Write([]byte(","))
+			if err != nil {
+				log.Fatalf("Error encoding response: %v", err)
+			}
+			n, err = w.Write([]byte(","))
+			if err != nil {
+				log.Fatalf("Error writing comma: %v", err)
+			}
+			if n != 1 {
+				log.Fatalf("Error writing comma: %v", err)
+			}
 		} else {
 			nonMapped++
 		}
@@ -98,58 +114,81 @@ func main() {
 
 	// Save output
 	output := map[string]interface{}{
-		// "nodeInfo":     nodeInfo,
 		"nonMapped":    nonMapped,
 		"hostsScraped": walk.TotalCount.Value(),
 		"date":         time.Now().UTC().Format(time.RFC3339),
 	}
 
-	file, err := os.Create("/usr/share/nginx/html/data/out.json.new")
+	err = createFile(output, responsesFile)
 	if err != nil {
 		log.Fatalf("Error creating output file: %v", err)
 	}
+}
+
+func createFile(output map[string]interface{}, responsesFile *os.File) error {
+	file, err := os.Create("/usr/share/nginx/html/data/out.json.new")
+	if err != nil {
+		return fmt.Errorf("error creating output file: %w", err)
+	}
 
 	if err := json.NewEncoder(file).Encode(output); err != nil {
-		log.Fatalf("Error writing to output file: %v", err)
+		return fmt.Errorf("error encoding output file: %w", err)
 	}
 
 	err = file.Close()
 	if err != nil {
-		log.Fatalf("Error closing output file: %v", err)
+		return fmt.Errorf("error closing output file: %w", err)
 	}
 
 	// Now we need to combine out.json.new and responses.json
 	file, err = os.OpenFile("/usr/share/nginx/html/data/out.json.new", os.O_RDWR, 0644)
 	if err != nil {
-		log.Fatalf("Error opening output file: %v", err)
+		return fmt.Errorf("error opening output file: %w", err)
 	}
 
 	// Seek to before the closing bracket
 	_, err = file.Seek(-2, io.SeekEnd)
 	if err != nil {
-		log.Fatalf("Error seeking to end of file: %v", err)
+		return fmt.Errorf("error seeking to before closing bracket: %w", err)
 	}
 	// Replace the closing bracket
-	file.Write([]byte(",\"nodeInfo\":"))
-	responsesFile.Seek(0, io.SeekStart)
+	n, err := file.Write([]byte(",\"nodeInfo\":"))
+	if err != nil {
+		return fmt.Errorf("error writing nodeInfo key: %w", err)
+	}
+	if n != 12 {
+		return fmt.Errorf("error writing nodeInfo key: %w", err)
+	}
+	_, err = responsesFile.Seek(0, io.SeekStart)
+	if err != nil {
+		return fmt.Errorf("error seeking to start of responses file: %w", err)
+	}
 	r := bufio.NewReader(responsesFile)
 	_, err = io.Copy(file, r)
 	if err != nil {
-		log.Fatalf("Error copying responses file to output file: %v", err)
+		return fmt.Errorf("error copying responses file to output file: %w", err)
 	}
 	// Write the closing bracket
-	file.Write([]byte("}"))
+	n, err = file.Write([]byte("}"))
+	if err != nil {
+		return fmt.Errorf("error writing closing bracket: %w", err)
+	}
+	if n != 1 {
+		return fmt.Errorf("error writing closing bracket: %w", err)
+	}
 	err = file.Sync()
 	if err != nil {
-		log.Fatalf("Error syncing output file: %v", err)
+		return fmt.Errorf("error syncing output file: %w", err)
 	}
 	err = responsesFile.Close()
 	if err != nil {
-		log.Fatalf("Error closing responses file: %v", err)
+		return fmt.Errorf("error closing responses file: %w", err)
 	}
 
 	err = os.Rename("/usr/share/nginx/html/data/out.json.new", "/usr/share/nginx/html/data/out.json")
 	if err != nil {
-		log.Fatalf("Error renaming output file: %v", err)
+		return fmt.Errorf("error renaming output file: %w", err)
 	}
+
+	return nil
 }
