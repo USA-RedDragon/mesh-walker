@@ -11,7 +11,7 @@ import (
 	"github.com/USA-RedDragon/mesh-walker/internal/concurrentarray"
 	"github.com/USA-RedDragon/mesh-walker/internal/data"
 	"github.com/USA-RedDragon/mesh-walker/internal/http"
-	"github.com/puzpuzpuz/xsync/v3"
+	"github.com/puzpuzpuz/xsync/v4"
 )
 
 type Task struct {
