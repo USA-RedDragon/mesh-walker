@@ -60,7 +60,7 @@ jobs:
 
       - name: Publish Test Report
         if: always() && !inputs.coverage
-        uses: mikepenz/action-junit-report@v5
+        uses: mikepenz/action-junit-report@e08919a3b1fb83a78393dfb775a9c37f17d8eea6 # v6.0.1
         with:
           report_paths: "report.xml"
           require_tests: true
