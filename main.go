@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/USA-RedDragon/mesh-walker/internal/output"
@@ -54,7 +56,8 @@ func run() error {
 		return fmt.Errorf("--progress-interval must be greater than 0")
 	}
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	walk := walker.NewWalker(*timeout, *retries, *jitter, *concurrency)
 	respChan, err := walk.Walk(ctx, *start)
@@ -73,7 +76,7 @@ func run() error {
 		}
 	}()
 
-	err = output.Write(*out, respChan, &counts, walk.TotalCount.Value)
+	err = output.Write(ctx, *out, respChan, &counts, walk.TotalCount.Value)
 	if err != nil {
 		return err
 	}

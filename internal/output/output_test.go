@@ -2,6 +2,7 @@ package output
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -98,7 +99,7 @@ func TestSampleRoundTrip(t *testing.T) {
 
 	out := filepath.Join(t.TempDir(), "out.json")
 	var counts Counts
-	if err := Write(out, responses, &counts, func() int64 { return sample.HostsScraped }); err != nil {
+	if err := Write(context.Background(), out, responses, &counts, func() int64 { return sample.HostsScraped }); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 
@@ -158,7 +159,7 @@ func TestWriteNoMappedNodes(t *testing.T) {
 	close(responses)
 	out := filepath.Join(t.TempDir(), "out.json")
 	var counts Counts
-	if err := Write(out, responses, &counts, func() int64 { return 0 }); err != nil {
+	if err := Write(context.Background(), out, responses, &counts, func() int64 { return 0 }); err != nil {
 		t.Fatalf("Write: %v", err)
 	}
 	got, err := os.ReadFile(out)
@@ -215,5 +216,27 @@ func TestSupernodeRewriteSkipsOldAPIs(t *testing.T) {
 	RewriteSupernodeLinks(&resp)
 	if lt := resp.SysinfoResponse1Point14.LinkInfo["a"].LinkType; lt != apimodels.LinkTypeTun {
 		t.Errorf("linkType = %s, want TUN", lt)
+	}
+}
+
+func TestWriteCanceledRemovesTempFiles(t *testing.T) {
+	dir := t.TempDir()
+	responses := make(chan *apimodels.SysinfoResponse)
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	var counts Counts
+	go func() {
+		done <- Write(ctx, filepath.Join(dir, "out.json"), responses, &counts, func() int64 { return 0 })
+	}()
+	cancel()
+	if err := <-done; err == nil {
+		t.Fatal("expected an error after cancel")
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("left %d files behind", len(entries))
 	}
 }

@@ -22,6 +22,8 @@ pause() {
 }
 
 walk() {
+    # Remove leftovers from a walk that was killed before it could clean up.
+    rm -f "$OUT".responses-* "$OUT.new"
     nice -n 19 /usr/bin/mesh-walker --out "$OUT" --concurrency "$CONCURRENCY" --progress-interval 5m &
     child=$!
     wait "$child"

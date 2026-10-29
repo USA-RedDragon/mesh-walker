@@ -4,6 +4,7 @@ package output
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -25,8 +26,9 @@ var now = time.Now
 
 // Write consumes responses until the channel closes. Each response with a
 // location is streamed to an intermediate file next to path. When the channel
-// closes, the final file is written to path+".new" and renamed to path.
-func Write(path string, responses <-chan *apimodels.SysinfoResponse, counts *Counts, hostsScraped func() int64) error {
+// closes, the final file is written to path+".new" and renamed to path. If ctx
+// ends first, Write removes its temporary files and returns ctx.Err().
+func Write(ctx context.Context, path string, responses <-chan *apimodels.SysinfoResponse, counts *Counts, hostsScraped func() int64) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
@@ -53,7 +55,17 @@ func Write(path string, responses <-chan *apimodels.SysinfoResponse, counts *Cou
 	enc := json.NewEncoder(w)
 
 	mapped := 0
-	for resp := range responses {
+	for {
+		var resp *apimodels.SysinfoResponse
+		var ok bool
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case resp, ok = <-responses:
+		}
+		if !ok {
+			break
+		}
 		counts.Completed.Add(1)
 		if resp == nil {
 			continue
