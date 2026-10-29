@@ -35,6 +35,7 @@ func (c *Counter) Value() int64 { return c.v.Load() }
 type Walker struct {
 	client      *http.Client
 	concurrency int
+	nodeURL     func(node string) string
 	TotalCount  *Counter
 
 	mu     sync.Mutex
@@ -51,6 +52,7 @@ func NewWalker(timeout time.Duration, retries int, jitter time.Duration, concurr
 	w := &Walker{
 		client:      http.NewClient(timeout, retries, jitter),
 		concurrency: concurrency,
+		nodeURL:     sysinfoURL,
 		TotalCount:  &Counter{},
 		seen:        make(map[string]struct{}),
 	}
@@ -120,9 +122,12 @@ func (w *Walker) worker(ctx context.Context, responses chan<- *apimodels.Sysinfo
 	}
 }
 
+func sysinfoURL(node string) string {
+	return fmt.Sprintf("http://%s.local.mesh:8080/cgi-bin/sysinfo.json?hosts=1&link_info=1&lqm=1", node)
+}
+
 func (w *Walker) walk(ctx context.Context, node string) (*apimodels.SysinfoResponse, error) {
-	url := fmt.Sprintf("http://%s.local.mesh:8080/cgi-bin/sysinfo.json?hosts=1&link_info=1&lqm=1", node)
-	resp, err := w.client.Get(ctx, url)
+	resp, err := w.client.Get(ctx, w.nodeURL(node))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sysinfo from node %s: %w", node, err)
 	}
