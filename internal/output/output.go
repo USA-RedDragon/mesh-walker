@@ -26,7 +26,8 @@ var now = time.Now
 
 // Write consumes responses until the channel closes. Each response with a
 // location is streamed to an intermediate file next to path. When the channel
-// closes, the final file is written to path+".new" and renamed to path. If ctx
+// closes, the final file is written to path+".new" and renamed to path. Then
+// the slim map.json and the node detail files are written next to it. If ctx
 // ends first, Write removes its temporary files and returns ctx.Err().
 func Write(ctx context.Context, path string, responses <-chan *apimodels.SysinfoResponse, counts *Counts, hostsScraped func() int64) error {
 	dir := filepath.Dir(path)
@@ -52,7 +53,8 @@ func Write(ctx context.Context, path string, responses <-chan *apimodels.Sysinfo
 	if n != 1 {
 		return fmt.Errorf("failed to write opening bracket: %w", err)
 	}
-	enc := json.NewEncoder(w)
+	var pos int64 = 1
+	var slim slimWriter
 
 	mapped := 0
 	for {
@@ -75,18 +77,18 @@ func Write(ctx context.Context, path string, responses <-chan *apimodels.Sysinfo
 		if lat != 0 && lon != 0 {
 			RewriteSupernodeLinks(resp)
 
-			err = enc.Encode(map[string]any{
-				"data": resp.GetObject(),
-			})
+			data, err := json.Marshal(resp.GetObject())
 			if err != nil {
 				return fmt.Errorf("failed to encode response for node %s (api %s): %w", resp.GetNode(), resp.APIVersion, err)
 			}
-			n, err = w.Write([]byte(","))
-			if err != nil {
-				return fmt.Errorf("failed to write comma: %w", err)
+			if err := slim.add(data, pos+int64(len(`{"data":`))); err != nil {
+				return fmt.Errorf("failed to read map fields of node %s: %w", resp.GetNode(), err)
 			}
-			if n != 1 {
-				return fmt.Errorf("failed to write comma: %w", err)
+			for _, part := range [][]byte{[]byte(`{"data":`), data, []byte("}\n,")} {
+				if _, err := w.Write(part); err != nil {
+					return fmt.Errorf("failed to write response for node %s: %w", resp.GetNode(), err)
+				}
+				pos += int64(len(part))
 			}
 			mapped++
 		} else {
@@ -128,6 +130,15 @@ func Write(ctx context.Context, path string, responses <-chan *apimodels.Sysinfo
 
 	if err := createFile(path, header, responsesFile); err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
+	}
+
+	err = slim.write(dir, responsesFile, mapFile{
+		Date:         header["date"].(string),
+		HostsScraped: header["hostsScraped"].(int64),
+		NonMapped:    header["nonMapped"].(int),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to write map data: %w", err)
 	}
 	return nil
 }

@@ -144,9 +144,16 @@ func TestSampleRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 1 {
-		t.Errorf("output directory has %d entries, want only out.json", len(entries))
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
 	}
+	want := []string{"details-" + date.UTC().Format("20060102T150405Z"), "map.json", "map.json.gz", "out.json"}
+	if !reflect.DeepEqual(names, want) {
+		t.Errorf("output directory has %v, want %v", names, want)
+	}
+
+	checkMapData(t, filepath.Dir(out), sample)
 }
 
 func jsonNumber(n int64) string {
