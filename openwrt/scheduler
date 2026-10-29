@@ -2,9 +2,15 @@
 # Run the walker once a minute after start when there is no data yet, then
 # every hour at minute 30. AREDN 4.26 has no crond, and its /etc/cron.hourly
 # runs relative to boot, so this loop does the scheduling.
+#
+# The walker only runs when the meshmap-data disk is mounted on /meshmap, so
+# it never writes the large data file to the node's flash.
 
-OUT=/meshmap/data/out.json
+DATA_ROOT=/meshmap
+MOUNTS=/proc/mounts
+OUT=$DATA_ROOT/data/out.json
 child=
+warned=
 
 # Fewer parallel fetches on nodes with less than 256 MB of RAM. Each fetch
 # holds one decoded sysinfo response in memory.
@@ -30,11 +36,29 @@ walk() {
     child=
 }
 
+data_mounted() {
+    grep -q "^[^ ]* $DATA_ROOT " "$MOUNTS"
+}
+
+# Walk if the data disk is mounted. Otherwise log at most once per hour.
+maybe_walk() {
+    if data_mounted; then
+        mkdir -p "$DATA_ROOT/data"
+        walk
+        return
+    fi
+    now=$(date +%Y%m%d%H)
+    if [ "$warned" != "$now" ]; then
+        warned=$now
+        logger -t meshmap "No meshmap-data disk is mounted on $DATA_ROOT, so the walk is skipped"
+    fi
+}
+
 trap '[ -n "$child" ] && kill "$child" 2>/dev/null; exit 0' TERM INT
 
-if [ ! -s "$OUT" ]; then
+if ! data_mounted || [ ! -s "$OUT" ]; then
     pause 60
-    walk
+    maybe_walk
 fi
 
 last=
@@ -44,5 +68,5 @@ while :; do
     hour=$(date +%Y%m%d%H)
     [ "$hour" = "$last" ] && continue
     last=$hour
-    walk
+    maybe_walk
 done

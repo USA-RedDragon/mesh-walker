@@ -22,7 +22,7 @@ The `meshmap` package (IPK and APK) installs:
 - `/etc/meshmap/appConfig.json`, linked from `/www/meshmap/appConfig.json` and kept across firmware upgrades
 - `/www/meshmap/data`, a link to `/meshmap/data`
 
-At boot the init script mounts the ext4 file system labeled `meshmap-data` on `/meshmap` if one exists. Otherwise the data stays on the root file system.
+At boot the init script mounts the ext4 file system labeled `meshmap-data` on `/meshmap` if one exists. Without that disk the walker does not run, so it never writes to the node's flash. It logs one line per hour instead.
 
 The walker runs about one minute after start when there is no data yet, and then every hour at minute 30. Nodes with less than 256 MB of RAM fetch 16 nodes at a time instead of 64.
 

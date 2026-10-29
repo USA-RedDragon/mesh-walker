@@ -28,17 +28,21 @@ find_data_disk() {
 
 mount_data() {
     local dev
-    grep -q "^[^ ]* $DATA_ROOT " /proc/mounts && return 0
+    if grep -q "^[^ ]* $DATA_ROOT " /proc/mounts; then
+        mkdir -p "$DATA_ROOT/data"
+        return 0
+    fi
     dev=$(find_data_disk) || return 0
     mkdir -p "$DATA_ROOT"
-    if ! mount -t ext4 -o noatime "$dev" "$DATA_ROOT"; then
-        logger -t meshmap "Failed to mount $dev on $DATA_ROOT, using the root file system"
+    if mount -t ext4 -o noatime "$dev" "$DATA_ROOT"; then
+        mkdir -p "$DATA_ROOT/data"
+    else
+        logger -t meshmap "Failed to mount $dev on $DATA_ROOT, the walker will not run"
     fi
 }
 
 start_service() {
     mount_data
-    mkdir -p "$DATA_ROOT/data"
     /usr/libexec/meshmap/mapurl boot
 
     procd_open_instance scheduler
