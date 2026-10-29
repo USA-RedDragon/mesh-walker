@@ -32,6 +32,7 @@ func run() error {
 	timeout := flag.Duration("timeout", 2*time.Minute, "timeout for each sysinfo request")
 	retries := flag.Int("retries", 5, "attempts for each sysinfo request")
 	jitter := flag.Duration("jitter", 5*time.Second, "maximum random delay before each attempt")
+	concurrency := flag.Int("concurrency", 64, "maximum number of nodes fetched at the same time")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -45,10 +46,13 @@ func run() error {
 	if *jitter <= 0 {
 		return fmt.Errorf("--jitter must be greater than 0")
 	}
+	if *concurrency < 1 {
+		return fmt.Errorf("--concurrency must be at least 1")
+	}
 
 	ctx := context.Background()
 
-	walk := walker.NewWalker(*timeout, *retries, *jitter)
+	walk := walker.NewWalker(*timeout, *retries, *jitter, *concurrency)
 	respChan, err := walk.Walk(ctx, *start)
 	if err != nil {
 		return fmt.Errorf("failed to start walk: %w", err)
