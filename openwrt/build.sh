@@ -94,7 +94,7 @@ package_binary() {
     # across firmware upgrades; data/ points at the walker output.
     cp -R "$DIST/site/." "$root/data/www/meshmap/"
     rm -rf "$root/data/www/meshmap/appConfig.json" "$root/data/www/meshmap/data"
-    cp "$PROJECT_ROOT/meshmap/public/appConfig.json" "$root/data/etc/meshmap/appConfig.json"
+    cp "$SCRIPT_DIR/appConfig.json"   "$root/data/etc/meshmap/appConfig.json"
     ln -s /etc/meshmap/appConfig.json "$root/data/www/meshmap/appConfig.json"
     ln -s /meshmap/data               "$root/data/www/meshmap/data"
     find "$root/data/www/meshmap" -type d -exec chmod 755 {} +
