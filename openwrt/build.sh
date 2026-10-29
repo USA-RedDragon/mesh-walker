@@ -80,6 +80,7 @@ package_binary() {
              "$root/data/etc/meshmap" \
              "$root/data/etc/arednsysupgrade.d" \
              "$root/data/www/meshmap" \
+             "$root/data/usr/share/meshmap" \
              "$root/data/www/cgi-bin"
 
     cp "$binary"                      "$root/data/usr/bin/mesh-walker"
@@ -89,19 +90,27 @@ package_binary() {
     cp "$SCRIPT_DIR/scheduler"        "$root/data/usr/libexec/meshmap/scheduler"
     cp "$SCRIPT_DIR/mapurl"           "$root/data/usr/libexec/meshmap/mapurl"
     cp "$SCRIPT_DIR/meshmap-data.cgi" "$root/data/www/cgi-bin/meshmap-data"
+    cp "$SCRIPT_DIR/meshmap-site.cgi" "$root/data/www/cgi-bin/meshmap-site"
     chmod 755                         "$root/data/usr/libexec/meshmap/scheduler" \
                                       "$root/data/usr/libexec/meshmap/mapurl" \
-                                      "$root/data/www/cgi-bin/meshmap-data"
+                                      "$root/data/www/cgi-bin/meshmap-data" \
+                                      "$root/data/www/cgi-bin/meshmap-site"
 
-    # MeshMap site. appConfig.json lives in /etc so it can be edited and kept
-    # across firmware upgrades; data/ points at the walker output.
-    cp -R "$DIST/site/." "$root/data/www/meshmap/"
-    rm -rf "$root/data/www/meshmap/appConfig.json" "$root/data/www/meshmap/data"
+    # MeshMap site. Only index.html is a static file under /www/meshmap; the
+    # rest is stored gzipped for the meshmap-site CGI. appConfig.json lives in
+    # /etc so it can be edited and kept across firmware upgrades; data/ points
+    # at the walker output.
+    local site="$root/data/usr/share/meshmap/site"
+    cp -R "$DIST/site" "$site"
+    rm -rf "$site/appConfig.json" "$site/data"
+    mv "$site/index.html" "$root/data/www/meshmap/index.html"
+    find "$site" -type f \( -name '*.js' -o -name '*.css' -o -name '*.json' -o -name '*.svg' \
+        -o -name '*.wasm' -o -name '*.pbf' -o -name '*.txt' -o -name '*.ico' \) -exec gzip -9n {} +
     cp "$SCRIPT_DIR/appConfig.json"   "$root/data/etc/meshmap/appConfig.json"
     ln -s /etc/meshmap/appConfig.json "$root/data/www/meshmap/appConfig.json"
     ln -s /meshmap/data               "$root/data/www/meshmap/data"
-    find "$root/data/www/meshmap" -type d -exec chmod 755 {} +
-    find "$root/data/www/meshmap" -type f -exec chmod 644 {} +
+    find "$root/data/www/meshmap" "$site" -type d -exec chmod 755 {} +
+    find "$root/data/www/meshmap" "$site" -type f -exec chmod 644 {} +
     chmod 644 "$root/data/etc/meshmap/appConfig.json"
 
     # Preserve config across AREDN firmware upgrades

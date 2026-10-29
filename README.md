@@ -42,7 +42,8 @@ The walker writes the detail files into a new `details-<stamp>` directory, then 
 The `meshmap` package (IPK and APK) installs:
 
 - `/usr/bin/mesh-walker`
-- MeshMap at `/www/meshmap/`, served by the node web server at `/meshmap/` on ports 80 and 8080
+- MeshMap's page at `/www/meshmap/index.html`, served by the node web server at `/meshmap/` on ports 80 and 8080
+- MeshMap's scripts, styles and glyphs, stored gzipped in `/usr/share/meshmap/site/` and served by `/www/cgi-bin/meshmap-site` with `Content-Encoding: gzip`. The site is built with `/cgi-bin/meshmap-site/` as its base. Files under `assets/` have content hashes in their names and are cached for a year; clients that do not accept gzip get the files unpacked.
 - `/etc/meshmap/appConfig.json`, linked from `/www/meshmap/appConfig.json` and kept across firmware upgrades
 - `/www/meshmap/data`, a link to `/meshmap/data`
 - `/www/cgi-bin/meshmap-data`, which serves `map.json` and the detail files from their `.gz` files with `Content-Encoding: gzip` (uhttpd cannot do this for static files) at `/cgi-bin/meshmap-data/map.json` and `/cgi-bin/meshmap-data/details-<stamp>/<shard>.json`

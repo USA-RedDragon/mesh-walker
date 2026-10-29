@@ -55,7 +55,8 @@ build_site() {
     mkdir -p "$DIST/site"
 
     # Build from a copy so node_modules never lands in the submodule. The
-    # relative base makes the site work under /meshmap/.
+    # page is served at /meshmap/, and its scripts, styles and glyphs from the
+    # meshmap-site CGI, which sends them gzip-compressed.
     # shellcheck disable=SC2086
     docker run --rm ${DOCKER_RUN_ARGS:-} \
         --user "$(id -u):$(id -g)" \
@@ -69,7 +70,7 @@ build_site() {
             cp -r /src/package.json /src/package-lock.json /src/src /src/index.html \
                 /src/vite.config.js /src/.env /src/public .
             npm ci --ignore-scripts --no-audit --no-fund
-            npm run build -- --base=./ --outDir /out --emptyOutDir
+            npm run build -- --base=/cgi-bin/meshmap-site/ --outDir /out --emptyOutDir
         '
 }
 
