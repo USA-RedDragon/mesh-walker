@@ -33,6 +33,7 @@ func run() error {
 	retries := flag.Int("retries", 5, "attempts for each sysinfo request")
 	jitter := flag.Duration("jitter", 5*time.Second, "maximum random delay before each attempt")
 	concurrency := flag.Int("concurrency", 64, "maximum number of nodes fetched at the same time")
+	progressInterval := flag.Duration("progress-interval", 2*time.Second, "how often to log walk progress")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 
@@ -49,6 +50,9 @@ func run() error {
 	if *concurrency < 1 {
 		return fmt.Errorf("--concurrency must be at least 1")
 	}
+	if *progressInterval <= 0 {
+		return fmt.Errorf("--progress-interval must be greater than 0")
+	}
 
 	ctx := context.Background()
 
@@ -62,7 +66,7 @@ func run() error {
 
 	var counts output.Counts
 	go func() {
-		for range time.Tick(2 * time.Second) {
+		for range time.Tick(*progressInterval) {
 			completed := counts.Completed.Load()
 			nonMapped := counts.NonMapped.Load()
 			slog.Info("Still walking", "completed", completed, "total", walk.TotalCount.Value(), "mapped", completed-nonMapped, "unmapped", nonMapped)
