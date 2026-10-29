@@ -37,7 +37,7 @@ mount_data() {
     if mount -t ext4 -o noatime "$dev" "$DATA_ROOT"; then
         mkdir -p "$DATA_ROOT/data"
     else
-        logger -t meshmap "Failed to mount $dev on $DATA_ROOT, the walker will not run"
+        logger -t meshmap -p daemon.err "Failed to mount $dev on $DATA_ROOT, the walker will not run"
     fi
 }
 

@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/USA-RedDragon/mesh-walker/internal/logging"
 	"github.com/USA-RedDragon/mesh-walker/internal/output"
 	"github.com/USA-RedDragon/mesh-walker/internal/walker/walker"
 )
@@ -17,6 +18,7 @@ import (
 var version = "dev"
 
 func main() {
+	slog.SetDefault(logging.New(os.Stdout, os.Stderr))
 	if err := run(); err != nil {
 		slog.Error("Walk failed", "error", err)
 		os.Exit(1)

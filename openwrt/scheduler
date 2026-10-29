@@ -50,7 +50,7 @@ maybe_walk() {
     now=$(date +%Y%m%d%H)
     if [ "$warned" != "$now" ]; then
         warned=$now
-        logger -t meshmap "No meshmap-data disk is mounted on $DATA_ROOT, so the walk is skipped"
+        logger -t meshmap -p daemon.warn "No meshmap-data disk is mounted on $DATA_ROOT, so the walk is skipped"
     fi
 }
 
