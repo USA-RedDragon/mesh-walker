@@ -79,7 +79,8 @@ package_binary() {
              "$root/data/etc/init.d" \
              "$root/data/etc/meshmap" \
              "$root/data/etc/arednsysupgrade.d" \
-             "$root/data/www/meshmap"
+             "$root/data/www/meshmap" \
+             "$root/data/www/cgi-bin"
 
     cp "$binary"                      "$root/data/usr/bin/mesh-walker"
     chmod 755                         "$root/data/usr/bin/mesh-walker"
@@ -87,8 +88,10 @@ package_binary() {
     chmod 755                         "$root/data/etc/init.d/$PKG_NAME"
     cp "$SCRIPT_DIR/scheduler"        "$root/data/usr/libexec/meshmap/scheduler"
     cp "$SCRIPT_DIR/mapurl"           "$root/data/usr/libexec/meshmap/mapurl"
+    cp "$SCRIPT_DIR/meshmap-data.cgi" "$root/data/www/cgi-bin/meshmap-data"
     chmod 755                         "$root/data/usr/libexec/meshmap/scheduler" \
-                                      "$root/data/usr/libexec/meshmap/mapurl"
+                                      "$root/data/usr/libexec/meshmap/mapurl" \
+                                      "$root/data/www/cgi-bin/meshmap-data"
 
     # MeshMap site. appConfig.json lives in /etc so it can be edited and kept
     # across firmware upgrades; data/ points at the walker output.

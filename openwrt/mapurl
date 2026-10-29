@@ -6,7 +6,9 @@
 #   mapurl boot      set ours again if a firmware upgrade or revert reset it
 #   mapurl remove    restore the saved map URL
 
-MAP_URL=/meshmap/
+MAP_URL='/meshmap/#12/(lat)/(lon)'
+# What meshmap 0.1.0 set, before MeshMap could center on the node.
+LEGACY_URL=/meshmap/
 AREDN_DEFAULT='https://worldmap.arednmesh.org/#12/(lat)/(lon)'
 SAVED=/etc/meshmap/previous-map-url
 MESH_CONFIG=/etc/config.mesh
@@ -42,7 +44,7 @@ case "$1" in
         if [ ! -f "$SAVED" ]; then
             mkdir -p "${SAVED%/*}"
             current=$(get_url)
-            [ "$current" = "$MAP_URL" ] && current="$AREDN_DEFAULT"
+            case "$current" in "$MAP_URL" | "$LEGACY_URL") current="$AREDN_DEFAULT" ;; esac
             printf '%s\n' "$current" > "$SAVED"
         fi
         set_url "$MAP_URL"
@@ -51,14 +53,14 @@ case "$1" in
         current=$(get_url)
         [ "$current" = "$MAP_URL" ] && exit 0
         previous=$(cat "$SAVED" 2>/dev/null)
-        if [ -z "$current" ] || [ "$current" = "$previous" ]; then
+        if [ -z "$current" ] || [ "$current" = "$previous" ] || [ "$current" = "$LEGACY_URL" ]; then
             set_url "$MAP_URL"
         fi
         ;;
     remove)
         [ -f "$SAVED" ] || exit 0
         current=$(get_url)
-        if [ -z "$current" ] || [ "$current" = "$MAP_URL" ]; then
+        if [ -z "$current" ] || [ "$current" = "$MAP_URL" ] || [ "$current" = "$LEGACY_URL" ]; then
             set_url "$(cat "$SAVED")"
         fi
         rm -f "$SAVED"

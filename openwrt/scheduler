@@ -29,7 +29,8 @@ pause() {
 
 walk() {
     # Remove leftovers from a walk that was killed before it could clean up.
-    rm -f "$OUT".responses-* "$OUT.new"
+    rm -f "$OUT".responses-* "$OUT.new" "$DATA_ROOT"/data/.map.json* "$DATA_ROOT"/data/.details-*/*
+    rmdir "$DATA_ROOT"/data/.details-* 2>/dev/null
     nice -n 19 /usr/bin/mesh-walker --out "$OUT" --concurrency "$CONCURRENCY" --progress-interval 5m &
     child=$!
     wait "$child"
