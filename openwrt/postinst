@@ -1,0 +1,5 @@
+#!/bin/sh
+/usr/libexec/meshmap/mapurl install
+/etc/init.d/meshmap enable
+/etc/init.d/meshmap start
+exit 0

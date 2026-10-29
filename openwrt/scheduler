@@ -1,0 +1,46 @@
+#!/bin/sh
+# Run the walker once a minute after start when there is no data yet, then
+# every hour at minute 30. AREDN 4.26 has no crond, and its /etc/cron.hourly
+# runs relative to boot, so this loop does the scheduling.
+
+OUT=/meshmap/data/out.json
+child=
+
+# Fewer parallel fetches on nodes with less than 256 MB of RAM. Each fetch
+# holds one decoded sysinfo response in memory.
+CONCURRENCY=64
+mem_kb=$(awk '/^MemTotal:/ { print $2 }' /proc/meminfo)
+if [ -n "$mem_kb" ] && [ "$mem_kb" -lt 262144 ]; then
+    CONCURRENCY=16
+fi
+
+pause() {
+    sleep "$1" &
+    child=$!
+    wait "$child"
+    child=
+}
+
+walk() {
+    nice -n 19 /usr/bin/mesh-walker --out "$OUT" --concurrency "$CONCURRENCY" --progress-interval 5m &
+    child=$!
+    wait "$child"
+    child=
+}
+
+trap '[ -n "$child" ] && kill "$child" 2>/dev/null; exit 0' TERM INT
+
+if [ ! -s "$OUT" ]; then
+    pause 60
+    walk
+fi
+
+last=
+while :; do
+    pause 20
+    [ "$(date +%M)" = 30 ] || continue
+    hour=$(date +%Y%m%d%H)
+    [ "$hour" = "$last" ] && continue
+    last=$hour
+    walk
+done

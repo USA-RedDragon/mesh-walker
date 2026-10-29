@@ -1,0 +1,5 @@
+#!/bin/sh
+/etc/init.d/meshmap stop
+/etc/init.d/meshmap disable
+/usr/libexec/meshmap/mapurl remove
+exit 0

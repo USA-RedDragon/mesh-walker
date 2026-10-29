@@ -1,0 +1,4 @@
+[submodule "meshmap"]
+	path = meshmap
+	url = https://github.com/USA-RedDragon/MeshMap.git
+	branch = k8s

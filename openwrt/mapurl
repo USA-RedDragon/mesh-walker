@@ -1,0 +1,70 @@
+#!/bin/sh
+# Point the AREDN map link at the local MeshMap and put the old value back on
+# removal.
+#
+#   mapurl install   save the current map URL once, then set ours
+#   mapurl boot      set ours again if a firmware upgrade or revert reset it
+#   mapurl remove    restore the saved map URL
+
+MAP_URL=/meshmap/
+AREDN_DEFAULT='https://worldmap.arednmesh.org/#12/(lat)/(lon)'
+SAVED=/etc/meshmap/previous-map-url
+MESH_CONFIG=/etc/config.mesh
+
+get_url() {
+    uci -q -c "$MESH_CONFIG" get 'aredn.@location[0].map'
+}
+
+set_in() {
+    local value="$1"
+    shift
+    if ! uci -q "$@" get 'aredn.@location[0]' >/dev/null; then
+        uci -q "$@" add aredn location >/dev/null || return 1
+    fi
+    if [ -n "$value" ]; then
+        uci -q "$@" set "aredn.@location[0].map=$value"
+    else
+        uci -q "$@" delete 'aredn.@location[0].map'
+    fi
+    uci -q "$@" commit aredn
+}
+
+# /etc/config.mesh is the source AREDN's node-setup copies to /etc/config.
+# The web UI reads /etc/config, so update both.
+set_url() {
+    set_in "$1" -c "$MESH_CONFIG"
+    [ -f /etc/config/aredn ] && set_in "$1"
+    return 0
+}
+
+case "$1" in
+    install)
+        if [ ! -f "$SAVED" ]; then
+            mkdir -p "${SAVED%/*}"
+            current=$(get_url)
+            [ "$current" = "$MAP_URL" ] && current="$AREDN_DEFAULT"
+            printf '%s\n' "$current" > "$SAVED"
+        fi
+        set_url "$MAP_URL"
+        ;;
+    boot)
+        current=$(get_url)
+        [ "$current" = "$MAP_URL" ] && exit 0
+        previous=$(cat "$SAVED" 2>/dev/null)
+        if [ -z "$current" ] || [ "$current" = "$previous" ]; then
+            set_url "$MAP_URL"
+        fi
+        ;;
+    remove)
+        [ -f "$SAVED" ] || exit 0
+        current=$(get_url)
+        if [ -z "$current" ] || [ "$current" = "$MAP_URL" ]; then
+            set_url "$(cat "$SAVED")"
+        fi
+        rm -f "$SAVED"
+        ;;
+    *)
+        echo "Usage: $0 install|boot|remove" >&2
+        exit 1
+        ;;
+esac
