@@ -1,20 +1,126 @@
 name: Release
 
-on:
-  push:
-    tags:
-      - "v*"
-
 concurrency:
   group: '${{ github.workflow }} @ ${{ github.ref }}'
   cancel-in-progress: false
 
+on:
+  pull_request:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
 jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Test
+        run: go test -race ./...
+
+  version:
+    name: Determine version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+    steps:
+      - name: Determine version
+        id: version
+        run: |
+          # Tag pushes return the tag. Other builds return a version apk
+          # accepts, so the packages can still be installed for testing.
+          if [[ "$GITHUB_REF" == 'refs/tags/'* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=0.0.0_git$(date -u +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
+          fi
+      - name: Print version
+        run: |
+          echo Building version: ${{ steps.version.outputs.VERSION }}
+
+  build:
+    needs: [ version ]
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - mips_24kc
+          - mipsel_24kc
+          - arm_cortex-a7_neon-vfpv4
+          - aarch64_cortex-a53
+          - x86_64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: true
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Build
+        run: |
+          ./build.sh ${{ matrix.arch }}
+        env:
+          PKG_VERSION: ${{ needs.version.outputs.version }}
+      - name: Upload binary
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ matrix.arch }}-bin
+          retention-days: 1
+          if-no-files-found: error
+          path: ./dist/${{ matrix.arch }}/mesh-walker
+      - name: Upload apk artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: openwrt-${{ matrix.arch }}-apk
+          retention-days: 1
+          if-no-files-found: error
+          path: ./openwrt/meshmap_${{ matrix.arch }}.apk
+      - name: Upload ipk artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: openwrt-${{ matrix.arch }}-ipk
+          retention-days: 1
+          if-no-files-found: error
+          path: ./openwrt/meshmap_${{ matrix.arch }}.ipk
+
   release:
-    name: Release
+    needs: [ version, test, build ]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
-      packages: write
-    uses: USA-RedDragon/reusable-actions/.github/workflows/goreleaser.yaml@v1.3.1
-    secrets:
-      token: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: artifacts
+      - name: Prepare release assets
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          mkdir -p release
+          for arch in mips_24kc mipsel_24kc arm_cortex-a7_neon-vfpv4 aarch64_cortex-a53 x86_64; do
+            cp "artifacts/${arch}-bin/mesh-walker" \
+               "release/mesh-walker_${VERSION}_${arch}"
+            cp artifacts/openwrt-${arch}-apk/*.apk \
+               "release/meshmap_${VERSION}_${arch}.apk"
+            cp artifacts/openwrt-${arch}-ipk/*.ipk \
+               "release/meshmap_${VERSION}_${arch}.ipk"
+          done
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ASSETS=()
+          while IFS= read -r f; do ASSETS+=("$f"); done < <(find release -type f | sort)
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            "${ASSETS[@]}"
