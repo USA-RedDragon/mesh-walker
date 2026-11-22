@@ -5,7 +5,7 @@ Walks an AREDN mesh and writes the MeshMap data file. The `meshmap` package runs
 ## Walker
 
 ```sh
-mesh-walker [--start NODE] [--out PATH] [--timeout 2m] [--retries 5] [--jitter 5s] [--concurrency 64] [--progress-interval 2s]
+mesh-walker [--start NODE] [--out PATH] [--timeout 30s] [--dial-timeout 10s] [--retries 2] [--jitter 1s] [--concurrency 64] [--progress-interval 2s]
 ```
 
 - `--start`: node to start from. The default is the hostname.

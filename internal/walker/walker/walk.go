@@ -46,12 +46,12 @@ type Walker struct {
 	seen   map[string]struct{}
 }
 
-func NewWalker(timeout time.Duration, retries int, jitter time.Duration, concurrency int) *Walker {
+func NewWalker(timeout, dialTimeout time.Duration, retries int, jitter time.Duration, concurrency int) *Walker {
 	if concurrency < 1 {
 		concurrency = 1
 	}
 	w := &Walker{
-		client:      http.NewClient(timeout, retries, jitter),
+		client:      http.NewClient(timeout, dialTimeout, retries, jitter),
 		concurrency: concurrency,
 		nodeURL:     sysinfoURL,
 		newNodeURL:  newSysinfoURL,

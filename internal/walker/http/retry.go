@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"syscall"
 	"time"
 
 	"github.com/USA-RedDragon/mesh-walker/internal/apimodels"
@@ -21,6 +22,17 @@ func (e *StatusError) Error() string {
 	return fmt.Sprintf("received status code %d", e.StatusCode)
 }
 
+// permanent reports whether a retry would get the same answer: the host
+// refused the connection, has no route, has no DNS name, or said 404.
+func permanent(err error) bool {
+	var dnsErr *net.DNSError
+	return IsNotFound(err) ||
+		errors.Is(err, syscall.ECONNREFUSED) ||
+		errors.Is(err, syscall.EHOSTUNREACH) ||
+		errors.Is(err, syscall.ENETUNREACH) ||
+		(errors.As(err, &dnsErr) && dnsErr.IsNotFound)
+}
+
 // IsNotFound reports whether err is a 404 response.
 func IsNotFound(err error) bool {
 	var se *StatusError
@@ -33,9 +45,9 @@ type Client struct {
 	jitter  time.Duration
 }
 
-func NewClient(timeout time.Duration, retries int, jitter time.Duration) *Client {
+func NewClient(timeout, dialTimeout time.Duration, retries int, jitter time.Duration) *Client {
 	dialer := &net.Dialer{
-		Timeout:   timeout,
+		Timeout:   dialTimeout,
 		KeepAlive: -1,
 	}
 	return &Client{
@@ -70,6 +82,9 @@ func (c *Client) Get(ctx context.Context, url string) (*apimodels.SysinfoRespons
 		var err error
 		resp, err = c.get(ctx, url)
 		if err != nil {
+			if permanent(err) {
+				return nil, err
+			}
 			if n == c.retries-1 {
 				return nil, fmt.Errorf("failed to get url after %d retries: %w", c.retries, err)
 			}

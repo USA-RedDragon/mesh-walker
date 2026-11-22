@@ -33,9 +33,10 @@ func run() error {
 
 	start := flag.String("start", hostname, "node to start the walk from")
 	out := flag.String("out", "/meshmap/data/out.json", "path of the MeshMap data file to write")
-	timeout := flag.Duration("timeout", 2*time.Minute, "timeout for each sysinfo request")
-	retries := flag.Int("retries", 5, "attempts for each sysinfo request")
-	jitter := flag.Duration("jitter", 5*time.Second, "maximum random delay before each attempt")
+	timeout := flag.Duration("timeout", 30*time.Second, "timeout for each sysinfo request")
+	dialTimeout := flag.Duration("dial-timeout", 10*time.Second, "timeout for connecting to a node")
+	retries := flag.Int("retries", 2, "attempts for each sysinfo request; refused, unroutable and 404 are not retried")
+	jitter := flag.Duration("jitter", time.Second, "maximum random delay before each attempt")
 	concurrency := flag.Int("concurrency", 64, "maximum number of nodes fetched at the same time")
 	progressInterval := flag.Duration("progress-interval", 2*time.Second, "how often to log walk progress")
 	showVersion := flag.Bool("version", false, "print the version and exit")
@@ -61,7 +62,7 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	walk := walker.NewWalker(*timeout, *retries, *jitter, *concurrency)
+	walk := walker.NewWalker(*timeout, *dialTimeout, *retries, *jitter, *concurrency)
 	respChan, err := walk.Walk(ctx, *start)
 	if err != nil {
 		return fmt.Errorf("failed to start walk: %w", err)

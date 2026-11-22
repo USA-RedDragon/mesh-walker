@@ -76,7 +76,7 @@ func TestWalkVisitsEveryHostOnceWithinConcurrency(t *testing.T) {
 	srv := httptest.NewServer(mesh)
 	defer srv.Close()
 
-	w := NewWalker(5*time.Second, 2, time.Nanosecond, concurrency)
+	w := NewWalker(5*time.Second, 5*time.Second, 2, time.Nanosecond, concurrency)
 	w.nodeURL = func(node string) string {
 		return srv.URL + "/cgi-bin/sysinfo.json?node=" + url.QueryEscape(strings.ToLower(node))
 	}
@@ -144,7 +144,7 @@ func TestWalkStartWithoutHosts(t *testing.T) {
 	srv := httptest.NewServer(mesh)
 	defer srv.Close()
 
-	w := NewWalker(5*time.Second, 1, time.Nanosecond, 2)
+	w := NewWalker(5*time.Second, 5*time.Second, 1, time.Nanosecond, 2)
 	w.nodeURL = func(node string) string {
 		return srv.URL + "/?node=" + url.QueryEscape(node)
 	}
@@ -166,7 +166,7 @@ func TestWalkStartFailure(t *testing.T) {
 	srv := httptest.NewServer(mesh)
 	defer srv.Close()
 
-	w := NewWalker(5*time.Second, 1, time.Nanosecond, 2)
+	w := NewWalker(5*time.Second, 5*time.Second, 1, time.Nanosecond, 2)
 	w.nodeURL = func(node string) string {
 		return srv.URL + "/?node=" + url.QueryEscape(node)
 	}
@@ -188,7 +188,7 @@ func TestWalkFallsBackToNewSysinfoPathOn404(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	w := NewWalker(5*time.Second, 5, time.Nanosecond, 1)
+	w := NewWalker(5*time.Second, 5*time.Second, 5, time.Nanosecond, 1)
 	w.nodeURL = func(node string) string {
 		return srv.URL + "/cgi-bin/sysinfo.json?node=" + url.QueryEscape(node)
 	}
@@ -207,5 +207,21 @@ func TestWalkFallsBackToNewSysinfoPathOn404(t *testing.T) {
 	}
 	if n := newHits.Load(); n != 1 {
 		t.Errorf("new path fetched %d times, want 1", n)
+	}
+}
+func TestWalkDoesNotRetryRefusedConnections(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	addr := srv.URL
+	srv.Close()
+
+	w := NewWalker(5*time.Second, 5*time.Second, 5, time.Nanosecond, 1)
+	w.nodeURL = func(string) string { return addr + "/cgi-bin/sysinfo.json" }
+	w.newNodeURL = w.nodeURL
+	_, err := w.walk(context.Background(), "gone")
+	if err == nil {
+		t.Fatal("expected an error for a closed port")
+	}
+	if strings.Contains(err.Error(), "retries") {
+		t.Errorf("a refused connection was retried: %v", err)
 	}
 }
