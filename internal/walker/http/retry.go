@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -10,6 +11,21 @@ import (
 
 	"github.com/USA-RedDragon/mesh-walker/internal/apimodels"
 )
+
+// StatusError is a response with a status other than 200 OK.
+type StatusError struct {
+	StatusCode int
+}
+
+func (e *StatusError) Error() string {
+	return fmt.Sprintf("received status code %d", e.StatusCode)
+}
+
+// IsNotFound reports whether err is a 404 response.
+func IsNotFound(err error) bool {
+	var se *StatusError
+	return errors.As(err, &se) && se.StatusCode == http.StatusNotFound
+}
 
 type Client struct {
 	client  http.Client
@@ -61,9 +77,12 @@ func (c *Client) Get(ctx context.Context, url string) (*apimodels.SysinfoRespons
 			continue
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode == http.StatusNotFound {
+			return nil, &StatusError{StatusCode: resp.StatusCode}
+		}
 		if resp.StatusCode != http.StatusOK {
 			if n == c.retries-1 {
-				return nil, fmt.Errorf("received non-200 status code after %d retries", c.retries)
+				return nil, fmt.Errorf("after %d retries: %w", c.retries, &StatusError{StatusCode: resp.StatusCode})
 			}
 			c.jitterSleep()
 			continue

@@ -36,6 +36,7 @@ type Walker struct {
 	client      *http.Client
 	concurrency int
 	nodeURL     func(node string) string
+	newNodeURL  func(node string) string
 	TotalCount  *Counter
 
 	mu     sync.Mutex
@@ -53,6 +54,7 @@ func NewWalker(timeout time.Duration, retries int, jitter time.Duration, concurr
 		client:      http.NewClient(timeout, retries, jitter),
 		concurrency: concurrency,
 		nodeURL:     sysinfoURL,
+		newNodeURL:  newSysinfoURL,
 		TotalCount:  &Counter{},
 		seen:        make(map[string]struct{}),
 	}
@@ -126,8 +128,17 @@ func sysinfoURL(node string) string {
 	return fmt.Sprintf("http://%s.local.mesh:8080/cgi-bin/sysinfo.json?hosts=1&link_info=1&lqm=1", node)
 }
 
+// newSysinfoURL is the only sysinfo path on firmware that dropped the
+// /cgi-bin/sysinfo.json redirect, such as AREDN nightlies from November 2026.
+func newSysinfoURL(node string) string {
+	return fmt.Sprintf("http://%s.local.mesh/a/sysinfo?hosts=1&link_info=1&lqm=1", node)
+}
+
 func (w *Walker) walk(ctx context.Context, node string) (*apimodels.SysinfoResponse, error) {
 	resp, err := w.client.Get(ctx, w.nodeURL(node))
+	if http.IsNotFound(err) {
+		resp, err = w.client.Get(ctx, w.newNodeURL(node))
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sysinfo from node %s: %w", node, err)
 	}

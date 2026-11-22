@@ -174,3 +174,38 @@ func TestWalkStartFailure(t *testing.T) {
 		t.Fatal("expected an error for an unreachable starting node")
 	}
 }
+func TestWalkFallsBackToNewSysinfoPathOn404(t *testing.T) {
+	var legacyHits, newHits atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		node := r.URL.Query().Get("node")
+		if r.URL.Path == "/cgi-bin/sysinfo.json" {
+			legacyHits.Add(1)
+			http.NotFound(w, r)
+			return
+		}
+		newHits.Add(1)
+		_ = json.NewEncoder(w).Encode(map[string]any{"api_version": "2.0", "node": node})
+	}))
+	defer srv.Close()
+
+	w := NewWalker(5*time.Second, 5, time.Nanosecond, 1)
+	w.nodeURL = func(node string) string {
+		return srv.URL + "/cgi-bin/sysinfo.json?node=" + url.QueryEscape(node)
+	}
+	w.newNodeURL = func(node string) string {
+		return srv.URL + "/a/sysinfo?node=" + url.QueryEscape(node)
+	}
+	resp, err := w.walk(context.Background(), "KD5TDK-QTH-5")
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+	if resp.GetNode() != "KD5TDK-QTH-5" {
+		t.Errorf("node = %q, want KD5TDK-QTH-5", resp.GetNode())
+	}
+	if n := legacyHits.Load(); n != 1 {
+		t.Errorf("legacy path fetched %d times, want 1 (a 404 is not retried)", n)
+	}
+	if n := newHits.Load(); n != 1 {
+		t.Errorf("new path fetched %d times, want 1", n)
+	}
+}
